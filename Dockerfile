@@ -12,9 +12,22 @@ RUN dep ensure -vendor-only
 COPY . /go/src/slurp
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o slurp .
 
-# add slurp to alpine container to optimize for size
+# Download ca-certificates
+FROM alpine:latest as certs
+RUN apk --update add ca-certificates
+
+# Put everything together in a clean image.
 FROM alpine
 WORKDIR /slurp
-COPY --from=build /go/src/slurp/slurp /go/bin/slurp
-COPY *.json /go/bin/
-ENTRYPOINT [ "/go/bin/slurp" ]
+
+# Copy slurp binary into PATH
+COPY --from=build /go/src/slurp/slurp /bin/slurp
+
+# Add certs.
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+
+# Add permutations to workdir.
+COPY *.json ./
+
+# Run slurp when the container starts
+ENTRYPOINT [ "/bin/slurp" ]
